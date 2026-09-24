@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { Inter } from "next/font/google";
+// Self-hosted variable Inter (woff2 from node_modules). Unlike next/font/google this
+// needs no network access at build time, so `next build` works offline / in CI.
+import "@fontsource-variable/inter";
 import "./globals.css";
-
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
 export const metadata: Metadata = {
   title: "DeepThink — Think deep. Build fast.",
@@ -15,7 +15,7 @@ const themeScript = `(function(){try{var t=localStorage.getItem("deepthink-theme
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={inter.variable} suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>

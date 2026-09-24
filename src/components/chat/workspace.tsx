@@ -15,12 +15,13 @@ export function Workspace({ onClose, embedded = false }: { onClose: () => void; 
     useChat();
   const [tab, setTab] = useState<Tab>("preview");
   const [width, setWidth] = useState(520);
-  const [draft, setDraft] = useState<string | null>(null);
+  const [draft, setDraft] = useState<{ path: string; content: string } | null>(null);
   const dragging = useRef(false);
 
   const file = files.find((f) => f.path === activeFile) ?? files[0] ?? null;
-
-  useEffect(() => setDraft(null), [activeFile]);
+  // The draft is keyed by path, so switching files can never surface stale edits
+  // (and no effect is needed to reset it).
+  const editing = draft && file && draft.path === file.path ? draft.content : null;
 
   const onPointerMove = useCallback((e: PointerEvent) => {
     if (!dragging.current) return;
@@ -158,10 +159,10 @@ export function Workspace({ onClose, embedded = false }: { onClose: () => void; 
                     size="sm"
                     variant="ghost"
                     className="ml-auto"
-                    disabled={draft === null}
+                    disabled={editing === null}
                     onClick={() => {
-                      if (file && draft !== null) {
-                        void saveFile(file.path, draft);
+                      if (file && editing !== null) {
+                        void saveFile(file.path, editing);
                         setDraft(null);
                         toast("File saved", { description: file.path });
                       }
@@ -172,8 +173,11 @@ export function Workspace({ onClose, embedded = false }: { onClose: () => void; 
                 </div>
                 <textarea
                   key={file?.path}
-                  value={draft ?? file?.content ?? ""}
-                  onChange={(e) => setDraft(e.target.value)}
+                  value={editing ?? file?.content ?? ""}
+                  onChange={(e) => {
+                    if (!file) return;
+                    setDraft({ path: file.path, content: e.target.value });
+                  }}
                   spellCheck={false}
                   aria-label={`Contents of ${file?.path ?? "file"}`}
                   className="scrollbar-slim min-h-0 flex-1 resize-none bg-code p-4 font-mono text-[12.5px] leading-relaxed focus:outline-none"
