@@ -2,6 +2,7 @@ import { and, asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { conversations, messages, type TraceStep } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth";
+import { api } from "@/lib/api";
 import type { AgentEvent } from "@/lib/agent/events";
 import { runAgent } from "@/lib/agent/run";
 import { completeOnce, hasDeepSeekKey, type ChatMessage } from "@/lib/agent/deepseek";
@@ -26,9 +27,9 @@ async function deriveTitle(prompt: string) {
   return (words.charAt(0).toUpperCase() + words.slice(1)).slice(0, 60) || "New chat";
 }
 
-export async function POST(req: Request) {
+export const POST = api(async (req: Request) => {
   const user = await getCurrentUser();
-  if (!user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+  if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = (await req.json().catch(() => ({}))) as {
     conversationId?: string;
@@ -37,7 +38,7 @@ export async function POST(req: Request) {
   };
   const content = (body.content ?? "").trim();
   const model = body.model === "deepseek-reasoner" ? "deepseek-reasoner" : "deepseek-chat";
-  if (!content) return new Response(JSON.stringify({ error: "Empty message" }), { status: 400 });
+  if (!content) return Response.json({ error: "Empty message" }, { status: 400 });
 
   let conversationId = body.conversationId ?? "";
   let conversation = conversationId
@@ -126,18 +127,22 @@ export async function POST(req: Request) {
         send({ type: "error", message: (err as Error).message });
       }
 
-      await db
-        .update(messages)
-        .set({
-          content: answer || "_No response generated._",
-          reasoning: reasoning || null,
-          trace: trace.length ? trace : null,
-        })
-        .where(eq(messages.id, assistantMessage.id));
-      await db
-        .update(conversations)
-        .set({ updatedAt: new Date(), model })
-        .where(eq(conversations.id, conversationId));
+      try {
+        await db
+          .update(messages)
+          .set({
+            content: answer || "_No response generated._",
+            reasoning: reasoning || null,
+            trace: trace.length ? trace : null,
+          })
+          .where(eq(messages.id, assistantMessage.id));
+        await db
+          .update(conversations)
+          .set({ updatedAt: new Date(), model })
+          .where(eq(conversations.id, conversationId));
+      } catch (err) {
+        send({ type: "error", message: `Could not persist this turn: ${(err as Error).message}` });
+      }
 
       send({ type: "done" });
       controller.close();
@@ -152,4 +157,4 @@ export async function POST(req: Request) {
       "X-Accel-Buffering": "no",
     },
   });
-}
+});

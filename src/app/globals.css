@@ -3,6 +3,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
+  --font-inter: "Inter Variable";
   --canvas: #faf9f7;
   --surface: #ffffff;
   --surface-2: #f3f1ed;

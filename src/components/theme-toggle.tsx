@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type Theme = "light" | "dark" | "system";
+export type Theme = "light" | "dark" | "system";
 const KEY = "deepthink-theme";
 
 export function applyTheme(theme: Theme) {
@@ -15,15 +15,29 @@ export function applyTheme(theme: Theme) {
   localStorage.setItem(KEY, theme);
 }
 
-export function ThemeToggle({ compact = false }: { compact?: boolean }) {
-  const [theme, setTheme] = useState<Theme>("system");
+/** The stored theme is external state (localStorage), so subscribe to it instead of copying it into state in an effect. */
+function subscribeToStorage(onChange: () => void) {
+  window.addEventListener("storage", onChange);
+  return () => window.removeEventListener("storage", onChange);
+}
 
-  useEffect(() => {
-    setTheme(((localStorage.getItem(KEY) as Theme) || "system") ?? "system");
-  }, []);
+function getStoredTheme(): Theme {
+  const value = localStorage.getItem(KEY);
+  return value === "light" || value === "dark" || value === "system" ? value : "system";
+}
+
+function getServerTheme(): Theme {
+  return "system";
+}
+
+export function ThemeToggle({ compact = false }: { compact?: boolean }) {
+  const stored = useSyncExternalStore(subscribeToStorage, getStoredTheme, getServerTheme);
+  // A click in this tab wins over the stored value until the store catches up.
+  const [pending, setPending] = useState<Theme | null>(null);
+  const theme = pending ?? stored;
 
   const set = (t: Theme) => {
-    setTheme(t);
+    setPending(t);
     applyTheme(t);
   };
 

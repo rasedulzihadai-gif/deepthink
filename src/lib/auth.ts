@@ -40,8 +40,15 @@ export async function createSession(userId: string) {
 export async function destroySession() {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
-  if (token) await db.delete(sessions).where(eq(sessions.token, token));
+  // Clear the cookie first so logout always succeeds, even with no database.
   jar.delete(SESSION_COOKIE);
+  if (token) {
+    try {
+      await db.delete(sessions).where(eq(sessions.token, token));
+    } catch (err) {
+      console.warn("[auth] could not revoke session row", (err as Error).message);
+    }
+  }
 }
 
 export async function getCurrentUser(): Promise<User | null> {
